@@ -1,0 +1,25 @@
+#!/usr/bin/python
+#GPLv2
+
+import png
+import os
+import sys
+import json
+
+def pr(*l):
+  print(l)
+
+with file('settings.json') as fin:
+  settings = json.load(fin)
+
+def main():
+  pr('G92')
+  pr('G28')
+
+  img = png.Reader(filename=sys.argv[1]).asRGB()
+  pr(img[2])
+    
+
+
+if __name__ == "__main__":
+  main()
