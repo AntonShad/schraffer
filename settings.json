@@ -1,4 +1,7 @@
 { 
   "inputDPI": "600",
-  "spotSize": "0.1"
+  "machineDPI": "2000",
+  "spotSize": "0.1",
+  "basicSpeed": "170",
+  "oversampling": "1"
 }
