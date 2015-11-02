@@ -7,19 +7,63 @@ import sys
 import json
 
 def pr(*l):
-  print(l)
+  print(" ".join(map(str, l)))
 
 with file('settings.json') as fin:
   settings = json.load(fin)
+  dpm = float(settings['inputDPI'])/25.4
+  spotsize = float(settings['spotSize'])
+
+def get_pixel(i, x, y, meta):
+  x *= meta['planes']
+  w = meta['size'][0]
+  l = i[y]
+  return l[x]
+
+def get_rect(img, x, y, size, meta):
+  r = []
+  for i in xrange(x-size, x+size):
+    for j in xrange(y-size, y+size):
+      r.append(get_pixel(img, x, y, meta))
+  return r
+
+def get_average(pixels):
+  return float(sum(pixels))/len(pixels)
 
 def main():
-  pr('G92')
-  pr('G28')
+  # header
+  pr('G90') # absolute pos
+  pr('G21') # units in mm
+  pr('G28') # go home
+  pr('G01 Z125 F9000') # go to standby position
 
-  img = png.Reader(filename=sys.argv[1]).asRGB()
-  pr(img[2])
-    
+  w, h, img, meta = png.Reader(filename=sys.argv[1]).asDirect()
+  img = list(img)
+  wdpm, hdpm = w/dpm, h/dpm
+  linescount = hdpm / spotsize
+  rowscount = wdpm / spotsize
+  spot_in_img = spotsize * dpm
 
+  pen_is_up = True
+  for lnum in xrange(int(linescount)):
+    for rnum in xrange(int(rowscount)):
+       re = get_rect(img, int(spot_in_img*rnum+spot_in_img), int(spot_in_img*lnum+spot_in_img), int(spot_in_img), meta)
+       avg = get_average(re)
+       _x, _y = lnum*spot_in_img/dpm, rnum*spot_in_img/dpm
+       if avg < 100:
+         if pen_is_up:
+           pr('G01 X{} Y{} Z125 F1600'.format(_x, _y))
+           pen_is_up = False
+
+           pr('G01 X{} Y{} Z121 F1950'.format(_x, _y))
+       else:
+         if not pen_is_up:
+           pr('G01 X{} Y{} Z121 F170'.format(_x, _y))
+           pr('G01 X{} Y{} Z125 F1950'.format(_x, _y))
+           pen_is_up = True
+
+  # footer
+  pr('G01 Z225 F9000')
 
 if __name__ == "__main__":
   main()
