@@ -3,5 +3,10 @@
   "machineDPI": "2000",
   "spotSize": "0.1",
   "basicSpeed": "170",
-  "oversampling": "1"
+  "oversampling": "2",
+  "focusSpeed": "1700",
+  "travelSpeed": "2000",
+  "focusedZ": "121",
+  "travelZ": "125",
+  "endZ": "225"
 }

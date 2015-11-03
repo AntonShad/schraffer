@@ -16,6 +16,12 @@ with file('settings.json') as fin:
   machinedpm = float(settings['machineDPI'])/25.4
   basic_speed = float(settings['basicSpeed'])
   oversampling = float(settings['oversampling'])
+  focus_speed = float(settings['focusSpeed'])
+  travel_speed = float(settings['travelSpeed'])
+  focusedZ = float(settings['focusedZ'])
+  travelZ = float(settings['travelZ'])
+  endZ = float(settings['endZ'])
+
 
 def get_pixel(i, x, y, meta):
   x *= meta['planes']
@@ -49,7 +55,7 @@ def main():
   pr('G90') # absolute pos
   pr('G21') # units in mm
   pr('G28') # go home
-  pr('G01 Z12.5 F9000') # go to standby position
+  pr('G01 Z{} F9000'.format(travelZ)) # go to standby position
 
   w, h, img, meta = png.Reader(filename=sys.argv[1]).asDirect()
   img = list(img)
@@ -62,6 +68,7 @@ def main():
   alt = False
   _cnt = 0
   _speed = basic_speed * oversampling # 170 is basic speed, 3 is oversampling
+  #l_x, l_y = (0,0)
   for lnum in xrange(int((linescount-1)*oversampling)):
     lnum /= float(oversampling)
     rows = xrange(int((rowscount-1)*oversampling))
@@ -79,18 +86,19 @@ def main():
        _x, _y = lnum*spot_in_img/dpm, rnum*spot_in_img/dpm
        if avg < 250:
          if pen_is_up:
-           pr('G01 X{} Y{} Z12.5 F1600'.format(_x, _y))
+           pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, travelZ, travel_speed))
            pen_is_up = False
 
-           pr('G01 X{} Y{} Z1.21 F1950'.format(_x, _y))
+           pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, focusedZ, focus_speed))
+           #l_x, l_y = (_x, _y)
        else:
          if not pen_is_up:
-           pr('G01 X{} Y{} Z1.21 F{}'.format(_x, _y, _speed))
-           pr('G01 X{} Y{} Z12.5 F1950'.format(_x, _y))
+           pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, focusedZ, _speed))
+           pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, travelZ, focus_speed))
            pen_is_up = True
 
   # footer
-  pr('G01 Z22.5 F9000')
+  pr('G01 Z{} F9000'.format(endZ))
 
 if __name__ == "__main__":
   main()
