@@ -35,11 +35,11 @@ def main():
   contours, hierarchy = cv2.findContours(img, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
   #print hierarchy
   for contour in contours:
-    pr('G5 L1')
-    for p in contour:
+    for i, p in enumerate(contour):
       p = p[0]
-      #print p
       pr('G01 X{} Y{} Z{} F{}'.format(p[0]/dpm, p[1]/dpm, focusedZ, basic_speed))
+      if i == 0:
+        pr('G5 L1')
     if len(contour) > 0:
       p = contour[0][0]
       pr('G01 X{} Y{} Z{} F{}'.format(p[0]/dpm, p[1]/dpm, focusedZ, basic_speed))
