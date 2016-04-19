@@ -1,15 +1,16 @@
 #!/usr/bin/python
 #GPLv2
 
-import png
-import os
+import cv2
 import sys
-import json
 
+import time
 def pr(*l):
   print(" ".join(map(str, l)))
+#  time.sleep(0.01)
 
 with file('settings.json') as fin:
+  import json
   settings = json.load(fin)
   dpm = float(settings['inputDPI'])/25.4
   spotsize = float(settings['spotSize'])
@@ -23,117 +24,37 @@ with file('settings.json') as fin:
   endZ = float(settings['endZ'])
   passes = int(settings['passes'])
 
-
-def get_pixel(i, x, y, meta):
-  x *= meta['planes']
-  w = meta['size'][0]
-  l = i[y]
-  #print>>sys.stderr, '\n',x
-  return l[x]
-
-def get_rect(img, x, y, size, meta):
-  r = []
-  for i in xrange(x-size, x+size):
-    for j in xrange(y-size, y+size):
-      r.append(get_pixel(img, x, y, meta))
-  return r
-
-def get_rect_avg(img, x, y, size, meta):
-  s = 0.0
-  count = 0
-  #print>>sys.stderr, x,y
-  for i in xrange(x-size, x+size):
-    for j in xrange(y-size, y+size):
-      s += get_pixel(img, x, y, meta)
-      count += 1
-  return s / count
-
-def get_average(pixels):
-  return float(sum(pixels))/len(pixels)
-
-
-import random
-def choose_neighbor(img, x, y, meta, visited, spotsize):
-  ns = []
-  for _x in range(x-1, x+2):
-    for _y in range(y-1, y+2):
-      if get_rect_avg(img, _x, _y, spotsize) < 250 and visited[y][x]:
-        ns.append((_x,_y))
-  return ns[random.randrange(0, len(ns))]
-
 def main():
   # header
   pr('G90') # absolute pos
   pr('G21') # units in mm
-  pr('G28') # go home
-  pr('G01 Z{} F9000'.format(travelZ)) # go to standby position
+  pr('M3 S1000') # set spindle speed to 1000
+  pr('G4 P15') # wait 10 seconds
+  pr('G00 Z{} F400'.format(travelZ)) # go to standby position
 
-  w, h, img, meta = png.Reader(filename=sys.argv[1]).asDirect()
-  img = list(img)
-  wdpm, hdpm = w/dpm, h/dpm
-  linescount = hdpm / spotsize
-  rowscount = wdpm / spotsize
-  spot_in_img = spotsize * dpm
+  img = cv2.imread(sys.argv[1], 0)
+#  imgray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-  global travelZ, focusedZ
+  contours, hierarchy = cv2.findContours(img, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+  #print hierarchy
+  for contour in contours:
+    for i, p in enumerate(contour):
+      p = p[0]
+      if i == 0:
+        pr('G00 X{} Y{} F{} (begin)'.format(p[0]/dpm, p[1]/dpm, travelZ, travel_speed))
+        pr('G01 Z{} F{} (begin)'.format(focusedZ, focus_speed))
+     #   pr('G5 L1')
+      pr('G01 X{} Y{} Z{} F{}'.format(p[0]/dpm, p[1]/dpm, focusedZ, basic_speed))
+    if len(contour) > 0:
+      p = contour[0][0]
+      pr('G01 X{} Y{} Z{} F{}'.format(p[0]/dpm, p[1]/dpm, focusedZ, basic_speed))
 
-  visited = [[False]*int(rowscount)]*int(linescount)
-
-  if passes > 1:
-    travelZ += 0.05
-    focusedZ += 0.05
-  for pass_id in xrange(passes):
-
-    pen_is_up = True
-    alt = False
-    _cnt = 0
-    _speed = basic_speed  # 170 is basic speed, 3 is oversampling
-    #l_x, l_y = (0,0)
-    for lnum in xrange(int(linescount)):
-      rows = xrange(int(rowscount))
-      rows = reversed(rows) if alt else rows
-      alt = not alt
-      _cnt += 1
-      if _cnt > 10:
-        print>>sys.stderr, 'PASS:', 1+pass_id, '/', passes, "{:.2f}%".format(100*lnum/float(linescount)), '   \r',
-        _cnt = 0
-      for rnum in rows:
-         if visited[lnum][rnum]:
-           continue
-         visited[lnum][rnum] = True
-         while True:
-           avg = get_rect_avg(img, int(spot_in_img*rnum+spot_in_img),
-                              int(spot_in_img*lnum+spot_in_img),
-                              int(spot_in_img), meta)
-           _x, _y = lnum*spot_in_img/dpm, rnum*spot_in_img/dpm
-           if avg < 150:
-             if pen_is_up:
-               pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, travelZ, travel_speed))
-               pen_is_up = False
-               if focus_speed > 0:
-                 pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, focusedZ, focus_speed))
-               pr('G05 L1')
-             
-             pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, focusedZ, _speed))
-             print>>sys.stderr, rnum, lnum
-             rnum, lnum = choose_neighbor(img, int(spot_in_img*rnum+spot_in_img),
-                              int(spot_in_img*lnum+spot_in_img),
-                              meta, visited, spot_in_img)
-             print>>sys.stderr, rnum, lnum
-               #l_x, l_y = (_x, _y)
-           else:
-             if not pen_is_up:
-               pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, focusedZ, _speed))
-               if focus_speed > 0:
-                 pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, travelZ, focus_speed))
-               pr('G05 L0')
-               pen_is_up = True
-             break
-
-    travelZ -= 0.05
-    focusedZ -= 0.05
-  # footer
-  pr('G01 Z{} F9000'.format(endZ))
+#    pr('G01 X{} Y{} Z{} F{}'.format(p[0]/dpm, p[1]/dpm, focusedZ, basic_speed))
+    #pr('G5 L0')
+    pr('G00 X{} Y{} Z{} F{} (retract)'.format(p[0]/dpm, p[1]/dpm, travelZ, basic_speed))
+  pr('G00 Z{} F400'.format(endZ))
+  pr('M05')
+  pr('M02')
 
 if __name__ == "__main__":
   main()
