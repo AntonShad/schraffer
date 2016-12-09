@@ -1,12 +1,13 @@
 { 
   "inputDPI": "600",
-  "machineDPI": "2000",
+  "machineDPI": "846",
   "spotSize": "0.1",
-  "basicSpeed": "170",
-  "oversampling": "2",
-  "focusSpeed": "1700",
-  "travelSpeed": "2000",
-  "focusedZ": "121",
-  "travelZ": "125",
-  "endZ": "225"
+  "basicSpeed": "100",
+  "oversampling": "1",
+  "focusSpeed": "100",
+  "travelSpeed": "100",
+  "focusedZ": "-0.05",
+  "travelZ": "1",
+  "endZ": "10",
+  "passes": "1"
 }
