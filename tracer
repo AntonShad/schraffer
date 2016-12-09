@@ -41,7 +41,7 @@ def main():
     for i, p in enumerate(contour):
       p = p[0]
       if i == 0:
-        pr('G00 X{} Y{} F{} (begin)'.format(p[0]/dpm, p[1]/dpm, travelZ, travel_speed))
+        pr('G00 X{} Y{} F{} (begin)'.format(p[0]/dpm, p[1]/dpm, travel_speed))
         pr('G01 Z{} F{} (begin)'.format(focusedZ, focus_speed))
      #   pr('G5 L1')
       pr('G01 X{} Y{} Z{} F{}'.format(p[0]/dpm, p[1]/dpm, focusedZ, basic_speed))
