@@ -5,24 +5,14 @@ import png
 import os
 import sys
 import json
+import datetime
+
+gcodeoutput = ""
 
 def pr(*l):
+  global gcodeoutput
+  gcodeoutput += " ".join(map(str, l)) + "\n"
   print(" ".join(map(str, l)))
-
-with file('settings.json') as fin:
-  settings = json.load(fin)
-  dpm = float(settings['inputDPI'])/25.4
-  spotsize = float(settings['spotSize'])
-  machinedpm = float(settings['machineDPI'])/25.4
-  basic_speed = float(settings['basicSpeed'])
-  oversampling = float(settings['oversampling'])
-  focus_speed = float(settings['focusSpeed'])
-  travel_speed = float(settings['travelSpeed'])
-  focusedZ = float(settings['focusedZ'])
-  travelZ = float(settings['travelZ'])
-  endZ = float(settings['endZ'])
-  passes = int(settings['passes'])
-
 
 def get_pixel(i, x, y, meta):
   x *= meta['planes']
@@ -33,8 +23,8 @@ def get_pixel(i, x, y, meta):
 
 def get_rect(img, x, y, size, meta):
   r = []
-  for i in xrange(x-size, x+size):
-    for j in xrange(y-size, y+size):
+  for i in range(x-size, x+size):
+    for j in range(y-size, y+size):
       r.append(get_pixel(img, x, y, meta))
   return r
 
@@ -42,8 +32,8 @@ def get_rect_avg(img, x, y, size, meta):
   s = 0.0
   count = 0
   #print>>sys.stderr, x,y
-  for i in xrange(x-size, x+size):
-    for j in xrange(y-size, y+size):
+  for i in range(x-size, x+size):
+    for j in range(y-size, y+size):
       s += get_pixel(img, x, y, meta)
       count += 1
   return s / count
@@ -52,6 +42,20 @@ def get_average(pixels):
   return float(sum(pixels))/len(pixels)
 
 def main():
+  with open('settings.json') as fin:
+    settings = json.load(fin)
+    dpm = float(settings['inputDPI'])/25.4
+    spotsize = float(settings['spotSize'])
+    machinedpm = float(settings['machineDPI'])/25.4
+    basic_speed = float(settings['basicSpeed'])
+    oversampling = float(settings['oversampling'])
+    focus_speed = float(settings['focusSpeed'])
+    travel_speed = float(settings['travelSpeed'])
+    focusedZ = float(settings['focusedZ'])
+    travelZ = float(settings['travelZ'])
+    endZ = float(settings['endZ'])
+    passes = int(settings['passes'])
+
   # header
   pr('G90') # absolute pos
   pr('G21') # units in mm
@@ -65,26 +69,26 @@ def main():
   rowscount = wdpm / spotsize
   spot_in_img = spotsize * dpm
 
-  global travelZ, focusedZ
+  
 
   if passes > 1:
     travelZ += 0.05
     focusedZ += 0.05
-  for pass_id in xrange(passes):
+  for pass_id in range(passes):
 
     pen_is_up = True
     alt = False
     _cnt = 0
     _speed = basic_speed * oversampling # 170 is basic speed, 3 is oversampling
     #l_x, l_y = (0,0)
-    for lnum in xrange(int((linescount-1)*oversampling)):
+    for lnum in range(int((linescount-1)*oversampling)):
       lnum /= float(oversampling)
-      rows = xrange(int((rowscount-1)*oversampling))
+      rows = range(int((rowscount-1)*oversampling))
       rows = reversed(rows) if alt else rows
       alt = not alt
       _cnt += 1
       if _cnt > 10:
-        print>>sys.stderr, 'PASS:', 1+pass_id, '/', passes, "{:.2f}%".format(100*lnum/float(linescount)), '   \r',
+        print('PASS:', 1+pass_id, '/', passes, "{:.2f}%".format(100*lnum/float(linescount)), '   \r', end='', file=sys.stderr)
         _cnt = 0
       for rnum in rows:
          rnum /= float(oversampling)
@@ -112,6 +116,9 @@ def main():
     focusedZ -= 0.05
   # footer
   pr('G01 Z{} F9000'.format(endZ))
+  timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H.%M.%S")
+  with open(f'gcode testing/output_{timestamp}.gcode', 'w') as fout:
+    fout.write(gcodeoutput)
 
 if __name__ == "__main__":
   main()
