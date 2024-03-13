@@ -3,6 +3,7 @@
 ## Dependencie
 
 * python2
+* python3 for Schraffer
 * python bindings to opencv (opencv-python on Fedora)
 * opencv
 
