@@ -1,24 +1,34 @@
-#!/usr/bin/python
 #GPLv2
+
+
+"""
+  This script is a modified version of the original shaffer.py script. 
+  www.github.com/hacxman/schraffer/blob/master/schraffer. The original script was written in python 2 and has been modified to work with python 3.
+"""
+
+
 
 import png
 import os
 import sys
 import json
 import datetime
+try:
+  from src.config import Config
+
+except ModuleNotFoundError:
+  from config import Config
+
 
 gcodeoutput = ""
 
 def pr(*l):
-  global gcodeoutput
-  gcodeoutput += " ".join(map(str, l)) + "\n"
-  print(" ".join(map(str, l)))
+  return " ".join(map(str, l)) + "\n"
 
 def get_pixel(i, x, y, meta):
   x *= meta['planes']
   w = meta['size'][0]
   l = i[y]
-  #print>>sys.stderr, '\n',x
   return l[x]
 
 def get_rect(img, x, y, size, meta):
@@ -31,17 +41,27 @@ def get_rect(img, x, y, size, meta):
 def get_rect_avg(img, x, y, size, meta):
   s = 0.0
   count = 0
-  #print>>sys.stderr, x,y
   for i in range(x-size, x+size):
     for j in range(y-size, y+size):
       s += get_pixel(img, x, y, meta)
       count += 1
+  if count == 0:
+    return 0
   return s / count
 
 def get_average(pixels):
   return float(sum(pixels))/len(pixels)
 
-def main():
+def image_to_gcode(filepath: str):
+  return main(filepath=filepath)
+
+
+def image_to_gcode_data(bytes: bytes):
+  return main(bytes=bytes)
+
+
+def main(filepath: str = None, bytes: bytes = None):
+  _gcodeoutput = ""
   with open('settings.json') as fin:
     settings = json.load(fin)
     dpm = float(settings['inputDPI'])/25.4
@@ -55,14 +75,16 @@ def main():
     travelZ = float(settings['travelZ'])
     endZ = float(settings['endZ'])
     passes = int(settings['passes'])
-
+  dpm = Config.get_instance("./data/config.ini")['dpi'] / 25.4
   # header
-  pr('G90') # absolute pos
-  pr('G21') # units in mm
-  pr('G28') # go home
-  pr('G01 Z{} F9000'.format(travelZ)) # go to standby position
-
-  w, h, img, meta = png.Reader(filename=sys.argv[1]).asDirect()
+  _gcodeoutput += pr('G90') # absolute pos
+  _gcodeoutput += pr('G21') # units in mm
+  _gcodeoutput += pr('G28') # go home
+  _gcodeoutput += pr('G00 Z{} F9000'.format(travelZ)) # go to standby position
+  if filepath:
+    w, h, img, meta = png.Reader(filename=filepath).asDirect()
+  elif bytes:
+    w, h, img, meta = png.Reader(bytes=bytes).asDirect()
   img = list(img)
   wdpm, hdpm = w/dpm, h/dpm
   linescount = hdpm / spotsize
@@ -98,27 +120,28 @@ def main():
          _x, _y = lnum*spot_in_img/dpm, rnum*spot_in_img/dpm
          if avg < 250:
            if pen_is_up:
-             pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, travelZ, travel_speed))
+             _gcodeoutput += pr('G00 X{} Y{} Z{} F{}'.format(_x, _y, travelZ, travel_speed))
              pen_is_up = False
              if focus_speed > 0:
-               pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, focusedZ, focus_speed))
-             pr('G05 L1')
+               _gcodeoutput += pr('G00 X{} Y{} Z{} F{}'.format(_x, _y, focusedZ, focus_speed))
+             _gcodeoutput += pr('G05 L1')
              #l_x, l_y = (_x, _y)
          else:
            if not pen_is_up:
-             pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, focusedZ, _speed))
+             _gcodeoutput += pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, focusedZ, _speed))
              if focus_speed > 0:
-               pr('G01 X{} Y{} Z{} F{}'.format(_x, _y, travelZ, focus_speed))
-             pr('G05 L0')
+               _gcodeoutput += pr('G00 X{} Y{} Z{} F{}'.format(_x, _y, travelZ, focus_speed))
+             _gcodeoutput += pr('G05 L0')
              pen_is_up = True
-
+    print('PASS:', 1+pass_id, '/', passes, "{:.2f}%".format(100*lnum/float(linescount)), '   \r', end='', file=sys.stderr)
     travelZ -= 0.05
     focusedZ -= 0.05
   # footer
-  pr('G01 Z{} F9000'.format(endZ))
+  _gcodeoutput += pr('G01 Z{} F9000'.format(endZ))
   timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H.%M.%S")
   with open(f'gcode testing/output_{timestamp}.gcode', 'w') as fout:
-    fout.write(gcodeoutput)
+    fout.write(_gcodeoutput)
+  return _gcodeoutput
 
 if __name__ == "__main__":
   main()
